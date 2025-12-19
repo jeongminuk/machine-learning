@@ -89,19 +89,19 @@
 
 ## 5. 공행성쌍 찾고 모델 학습 시작
 
-### 5.1. 첫 방법론
+### 5.1. 첫 방법론 (score = 0.344)
 [1st-try](1st_try.ipynb) : linear regression
 
-### 5.2. 두 번째 방법론 (최고점)
+### 5.2. 두 번째 방법론 (score = 0.363)
 [2nd-try](2nd_try.ipynb) : xgboost classifier & xgboost regressor
 
-### 5.3. 세 번째 방법론
+### 5.3. 세 번째 방법론 (score = 0.359)
 [3rd-try](3rd_try.ipynb): hybrid(linear+xgboost)
 
-### 5.4
-[4th-try](4th_try.ipynb): ridge
+### 5.4. 네 번째 방법론 (score = 0.154) ❌
+[4th-try]: ridge 
 
-### 5.5
+### 5.5. 다섯 번째 방법론 (score = 0.201) ❌
 [5th-try](5th_try.ipynb): ensemble
 ---
 
@@ -115,5 +115,62 @@
 ---
 
 ## 개선할 점
+# 📈 코드 개선 제안 및 피드백 보고서
+
+제공된 코드는 **전처리-학습-추론**의 파이프라인이 논리적으로 잘 구성되어 있으며, `TimeSeriesSplit`과 `Log Transformation`을 적용한 점이 훌륭합니다. 
+하지만 **데이터 누수(Data Leakage)** 방지와 **연산 효율성** 측면에서 필수적인 개선이 필요합니다.
 
 ---
+
+## 🚀 1. 핵심 개선 사항: 데이터 누수(Data Leakage) 방지
+> **가장 시급한 수정 사항입니다.**
+
+* **현상**: `extract_pair_features`와 `seasonal_table` 계산 시 전체 기간(Train + Test) 데이터를 사용하고 있습니다.
+* **문제**: 미래 정보를 미리 알고 학습하는 **Look-ahead Bias**가 발생합니다. 이로 인해 검증 점수는 높게 나오지만, 실전(Test) 성능은 급격히 떨어질 수 있습니다.
+* **✅ 해결 방안**:
+    1.  **Split 후 통계 산출**: 상관계수와 계절성 지수는 반드시 **Train Set(과거 시점)** 기준으로만 계산해야 합니다.
+    2.  **Rolling Correlation**: 전체 기간 고정 상관계수 대신, `Window`를 적용한 **이동 상관계수**를 피처로 사용하는 것이 시계열 특성을 더 잘 반영합니다.
+
+---
+
+## ⚡ 2. 연산 속도 최적화 (Vectorization)
+* **현상**: `extract_pair_features` 함수가 이중 `for` 루프($O(N^2)$)로 구현되어 있어 아이템 수가 늘어나면 연산 시간이 기하급수적으로 증가합니다.
+* **✅ 해결 방안**:
+    * **Matrix Operation**: `pandas.DataFrame.corr()` 메서드를 활용하여 모든 아이템 간의 상관계수 행렬을 한 번에 계산한 뒤 필터링하세요.
+    * **FAISS 도입**: 아이템 수가 수만 개 이상일 경우, `FAISS` 라이브러리를 통해 유사한 시계열 벡터를 고속으로 검색할 수 있습니다.
+
+---
+
+## 🛠 3. 피처 엔지니어링 고도화 (Feature Engineering)
+단순 상관관계 외에 예측력을 높일 수 있는 파생 변수 아이디어입니다.
+
+1.  **Granger Causality (그레인저 인과관계)**
+    * 단순 상관계수는 선후 관계를 보장하지 않습니다. Leader가 Follower에 통계적으로 유의미한 선행성을 가지는지 검정(`statsmodels` 활용)하여 피처로 추가하세요.
+2.  **거시 경제 및 외부 데이터**
+    * 개별 아이템 간의 관계뿐만 아니라, 전체 시장의 트렌드(Global Mean)나 거시 지표를 반영하면 예측력이 향상될 수 있습니다.
+3.  **주기성(Cyclical) 인코딩**
+    * 월(Month) 정보를 단순 숫자가 아닌 연속적인 주기로 표현하세요.
+    ```python
+    df['sin_month'] = np.sin(2 * np.pi * df['month']/12)
+    df['cos_month'] = np.cos(2 * np.pi * df['month']/12)
+    ```
+
+---
+
+## 🎯 4. 모델링 및 목적 함수 (Objective Function)
+* **현상**: 평가지표는 **WMAPE**이나, 학습 손실 함수는 `MSE` 기반(`reg:squarederror`)을 사용 중입니다.
+* **✅ 해결 방안**:
+    * **Objective 변경**: `reg:absoluteerror` (MAE)를 사용하거나, WMAPE에 근사하는 **Custom Objective Function**을 작성하여 적용해 보세요.
+    * **Ensemble**: XGBoost 외에 **LightGBM**, **CatBoost** 모델을 추가하여 평균 앙상블(Average Ensemble)을 수행하면 일반화 성능이 좋아집니다.
+
+---
+
+## 📝 요약: 개선 로드맵
+
+| 우선순위 | 구분 | 내용 | 난이도 |
+| :-- | :-- | :-- | :-- |
+| **1 (즉시)** | **Data Leakage** | `max_corr`, `season_index` 계산 시 **Validation Set 제외** | ⭐ |
+| **2** | **Optimization** | 이중 for문을 `corr()` 행렬 연산으로 대체 | ⭐⭐ |
+| **3** | **Feature** | `Granger Causality`, `Sin/Cos Time encoding` 추가 | ⭐⭐⭐ |
+| **4** | **Model** | Loss Function을 `MAE` 또는 `Custom WMAPE`로 변경 | ⭐⭐⭐ |
+| **5** | **Ensemble** | LightGBM 모델 추가하여 앙상블 적용 | ⭐⭐ |
