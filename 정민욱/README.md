@@ -92,23 +92,28 @@
 ### 5.1. 첫 방법론
 [1st-try](1st_try.ipynb) : linear regression
 
-### 5.2. 두 번째 방법론
-[2nd-try](2nd_try.ipynb) : xgboost
+### 5.2. 두 번째 방법론 (최고점)
+[2nd-try](2nd_try.ipynb) : xgboost classifier & xgboost regressor
 
 ### 5.3. 세 번째 방법론
 [3rd-try](3rd_try.ipynb): hybrid(linear+xgboost)
 
 ### 5.4
+[4th-try](4th_try.ipynb): ridge
+
+### 5.5
+[5th-try](5th_try.ipynb): ensemble
 ---
 
-##
-
+## 결과
+![DACON 순위](DACON순위.png)
+결과적으로 0.361xxx가 나왔다. 
 ---
 
-##
-
+## 아쉬운 점
+결과가 만족스럽지는 못했지만 머신러닝에 흥미를 끌어올릴 수 있었다. 또 시간,공간적 제약으로 eda를 제대로 반영하지 못한 것이 아쉬움이 남는다. 기계학습 강의내용을 바탕으로 프로젝트를 진행했었는데 확실히 배운 내용을 토대로 모델을 학습시키니 점점 점수가 좋아졌다. Transformer을 사용한 모델도 사용해보려 했지만 부족한 이해 때문에 좋은 점수를 얻지 못했다.
 ---
 
-##
+## 개선할 점
 
 ---
